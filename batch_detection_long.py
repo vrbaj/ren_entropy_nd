@@ -7,12 +7,12 @@ from scipy.optimize import fsolve
 from scipy.optimize import fmin
 
 # data generation
-experiment_len = 1500
+experiment_len = 150000
 inputs_number = 2
 filter_len = 3
-parameter_change_idx = 1000
+parameter_change_idx = 10000
 
-x = np.random.rand(experiment_len, inputs_number)
+x = np.random.rand(experiment_len, inputs_number)+0
 desired_output = np.zeros([experiment_len, ])
 filter_data = np.zeros([experiment_len, 3])
 
@@ -20,16 +20,21 @@ for idx in range(experiment_len):
     filter_data[idx, 0] = x[idx, 0]
     filter_data[idx, 1] = x[idx, 1]
     filter_data[idx, 2] = x[idx, 0] * x[idx, 1]
-    if idx < 500:
-        desired_output[idx] = 0.5 * x[idx, 0] + 0.5 * x[idx, 1] + 0.5 * x[idx, 0] * x[idx, 1] + 0.1 * np.random.normal(0, 0.05, 1)
+
+    if idx < 10000:
+        desired_output[idx] = 1.5 * x[idx, 0] + 0.5 * x[idx, 1] + 0.5 * x[idx, 0] * x[idx, 1] + 0.001 * np.random.normal(0, 0.05, 1)
     # elif 500 <= idx <1000:
     #     desired_output[idx] = 1.5 * x[idx, 0] + 0.25 * x[idx, 1] + 0.5 * x[idx, 0] * x[idx, 1] + np.random.normal(0, 0.05, 1)
+    elif 13000 > idx >10000:
+        desired_output[idx] = 0.55 * x[idx, 0] + 0.52 * x[idx, 1] + 0.5 * x[idx, 0] * x[
+            idx, 1] + 0.001 * np.random.normal(0, 0.05, 1)
+
     else:  # 0.4 1.6
-        desired_output[idx] = 0.55 * x[idx, 0] + 0.52 * x[idx, 1] +  0.5 * x[idx, 0] * x[idx, 1] + 0.1 * np.random.normal(0, 0.05, 1)
+        desired_output[idx] = 0.5 * x[idx, 0] + 0.5 * x[idx, 1] +  0.5 * x[idx, 0] * x[idx, 1] + 0.001 * np.random.normal(0, 0.05, 1)
 
 
 honu_filter = pa.filters.FilterGNGD(filter_len, mu=1., w=np.array([0.5, 0.5, 0.5]))
-honu_filter.w = np.array([0.5, 0.5, 0.5])
+honu_filter.w = np.array([1.5, 0.5, 0.5])
 y, e, w = honu_filter.run(desired_output, filter_data)
 
 
@@ -38,7 +43,7 @@ dw[1:] = np.diff(dw, n=1, axis=0)
 dw_count = int(dw.shape[0])
 
 # batch creation
-batch_size = 1500
+batch_size = 150000
 batches = {}
 batch_n = 0
 for k, weights in enumerate(dw):
@@ -87,16 +92,16 @@ for xk_item in xk:
     # beta_k.append(1 - beta.cdf(xk, filter_len / 2, 1/(1-alpha) - filter_len/2))
     rho_k.append(np.linalg.norm(xk_item))
 rho = 1 / batch_size * np.sum(rho_k)
-print(rho)
+print("rho: ", rho)
 
 
 # solve Er - rho = 0
 p_value = []
 initial_guess = filter_len / (filter_len + 2) + 0.00001
-func = lambda alpha: (((2 * alpha / (1 - alpha) - filter_len) ** 0.5) * (gamma((filter_len + 1)/1) * gamma(1/(1 - alpha) - (filter_len + 1)/2)) / (gamma(filter_len / 2) * gamma(1/(1-alpha) - filter_len / 2)) - rho) ** 2
+func = lambda alpha: (((2 * alpha / (1 - alpha) - filter_len) ** 0.5) * (gamma((filter_len + 1)/2) * gamma(1/(1 - alpha) - (filter_len + 1)/2)) / (gamma(filter_len / 2) * gamma(1/(1-alpha) - filter_len / 2)) - rho) ** 2
 alpha_solution = fmin(func, initial_guess)
 if alpha_solution[0] == initial_guess:
-    alpha_solution[0] = 2
+    alpha_solution[0] = 1
 
 print("alpha solution: ", alpha_solution[0])
 if filter_len / (filter_len + 2) < alpha_solution[0] < 1:
@@ -110,12 +115,12 @@ for xk in batches["batch_1"]:
     if filter_len / (filter_len + 2) < alpha_solution[0] < 1:
         wk = (np.linalg.norm(xk) ** 2) / (np.linalg.norm(xk) ** 2 + s_star ** 2)
         # wk = np.linalg.norm(xk) ** 2
-        p_value.append(beta.cdf(wk, filter_len / 2, 1/(1-alpha_solution) - filter_len/2))
+        p_value.append(1-beta.cdf(wk, filter_len / 2, 1/(1-alpha_solution) - filter_len/2))
     else:
         p_value.append(1 - chi2.cdf(np.linalg.norm(xk), filter_len))
 
 
-plt.plot(p_value)
+plt.plot(p_value[1:])
 plt.xlabel("k [-]")
 plt.ylabel("pvalue")
 
